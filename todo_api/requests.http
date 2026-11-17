@@ -1,6 +1,7 @@
 @base = http://localhost:3000/api/v1
 
 ### Register
+# @name register
 POST {{base}}/auth/register
 Content-Type: application/json
 
@@ -13,6 +14,49 @@ Content-Type: application/json
 
 { "email": "ada@example.com", "password": "correct-horse-9" }
 
+### Refresh
+POST {{base}}/auth/refresh
+Content-Type: application/json
+
+{ "refreshToken": "{{login.response.body.data.refreshToken}}" }
+
 ### Who am I?
 GET {{base}}/auth/me
+Authorization: Bearer {{login.response.body.data.accessToken}}
+
+### Logout
+POST {{base}}/auth/logout
+Content-Type: application/json
+
+{ "refreshToken": "{{login.response.body.data.refreshToken}}" }
+
+### List todos (pagination + filter)
+GET {{base}}/todos?page=1&limit=20
+Authorization: Bearer {{login.response.body.data.accessToken}}
+
+### List only completed todos
+GET {{base}}/todos?completed=true
+Authorization: Bearer {{login.response.body.data.accessToken}}
+
+### Create a todo
+# @name createTodo
+POST {{base}}/todos
+Content-Type: application/json
+Authorization: Bearer {{login.response.body.data.accessToken}}
+
+{ "title": "Write the lab", "dueDate": "2026-11-20" }
+
+### Read one todo
+GET {{base}}/todos/{{createTodo.response.body.data.id}}
+Authorization: Bearer {{login.response.body.data.accessToken}}
+
+### Update one todo (PATCH = only the fields sent)
+PATCH {{base}}/todos/{{createTodo.response.body.data.id}}
+Content-Type: application/json
+Authorization: Bearer {{login.response.body.data.accessToken}}
+
+{ "completed": true }
+
+### Delete one todo
+DELETE {{base}}/todos/{{createTodo.response.body.data.id}}
 Authorization: Bearer {{login.response.body.data.accessToken}}

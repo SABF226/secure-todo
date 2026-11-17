@@ -38,7 +38,22 @@ export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
     return;
   }
 
-  // 4. Anything else is a bug: log it, but never leak details to the client.
+  // 4. Body larger than the 100 kB cap. body-parser raises this with
+  // `type: 'entity.too.large'` and status 413: it is a client error,
+  // not an internal bug, so it must not be logged as one.
+  if (
+    typeof err === 'object' &&
+    err !== null &&
+    'type' in err &&
+    err.type === 'entity.too.large'
+  ) {
+    res.status(413).json({
+      error: { code: 'PAYLOAD_TOO_LARGE', message: 'Request body too large' },
+    });
+    return;
+  }
+
+  // 5. Anything else is a bug: log it, but never leak details to the client.
   logger.error(err, 'Unhandled error');
   res.status(500).json({
     error: { code: 'INTERNAL_ERROR', message: 'Something went wrong' },
