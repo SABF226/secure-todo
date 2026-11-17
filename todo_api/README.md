@@ -1,8 +1,10 @@
-# Secure Todo API — Lab 1
+# Secure Todo API — Labs 1 & 2
 
 REST API for a per-user todo app, built for the *Advanced Mobile Development* labs.
-**Lab 1 scope:** project skeleton, configuration, centralised errors, and authentication
-(register, login, refresh-token rotation, logout, profile). The `todos` resource arrives in Lab 2.
+**Lab 1:** project skeleton, configuration, centralised errors, and authentication
+(register, login, refresh-token rotation, logout, profile).
+**Lab 2:** the `todos` resource with owner scoping (BOLA defence), integration tests and a
+security review.
 
 ## Stack
 
@@ -25,9 +27,14 @@ todo_api/
 ├── docker-compose.yml        # MongoDB 8 (host port 27018)
 ├── .env.example              # documented configuration (committed)
 ├── .env                      # real values incl. JWT secret (git-ignored)
+├── .env.test                 # test configuration, database `todo_test`
 ├── requests.http             # REST Client requests for manual testing
 ├── scripts/
 │   └── verify-lab1.mjs       # end-to-end verification (30 checks)
+├── test/
+│   ├── helpers.ts            # supertest client, test DB lifecycle, registerUser
+│   ├── auth.test.ts          # registration, duplicate, enumeration, refresh replay
+│   └── todos.test.ts         # CRUD, validation, pagination, user isolation
 ├── src/
 │   ├── app.ts                # createApp(): middleware pipeline + routes
 │   ├── server.ts             # connect DB, listen, graceful shutdown
@@ -42,16 +49,23 @@ todo_api/
 │   ├── types/
 │   │   └── express.d.ts      # req.userId typing
 │   └── modules/
-│       └── auth/
-│           ├── user.model.ts           # schema + DTO
-│           ├── refresh-token.model.ts  # hashed tokens, family, TTL
-│           ├── auth.schemas.ts         # Zod request schemas
-│           ├── token.service.ts        # JWT + refresh rotation
-│           ├── auth.service.ts         # business rules
-│           ├── auth.controller.ts      # HTTP in/out
-│           └── auth.routes.ts          # URLs + rate limiting
+│       ├── auth/
+│       │   ├── user.model.ts           # schema + DTO
+│       │   ├── refresh-token.model.ts  # hashed tokens, family, TTL
+│       │   ├── auth.schemas.ts         # Zod request schemas
+│       │   ├── token.service.ts        # JWT + refresh rotation
+│       │   ├── auth.service.ts         # business rules
+│       │   ├── auth.controller.ts      # HTTP in/out
+│       │   └── auth.routes.ts          # URLs + rate limiting
+│       └── todos/
+│           ├── todo.model.ts           # schema, compound index, DTO
+│           ├── todo.schemas.ts         # create/update/list/id schemas
+│           ├── todo.service.ts         # every query scoped by owner
+│           ├── todo.controller.ts      # HTTP in/out
+│           └── todo.routes.ts          # URLs + authenticate guard
 └── docs/
-    └── lab1-report.md        # lab report (French)
+    ├── lab1-report.md        # Lab 1 report (French)
+    └── lab2-report.md        # Lab 2 report (French)
 ```
 
 ## Getting started
@@ -94,7 +108,10 @@ Invalid or missing variables stop the process at boot and name the culprit.
 | `npm run dev` | `node --env-file=.env --watch src/server.ts` | Development server with reload |
 | `npm start` | `node --env-file=.env src/server.ts` | Production-style start |
 | `npm run typecheck` | `tsc --noEmit` | Type checking |
-| `npm test` | `node --env-file=.env.test --test ...` | Automated tests (added in Lab 2) |
+| `npm test` | `node --env-file=.env.test --test ...` | Integration tests (real HTTP, `todo_test` database) |
+
+The test configuration lives in `.env.test`. The helper refuses to run if `MONGO_URI` does not
+end with `_test`, so a mistyped command can never wipe the development database.
 
 ## API
 
@@ -110,9 +127,28 @@ Base URL: `/api/v1`. All responses are JSON; errors always share one envelope.
 | POST | `/api/v1/auth/refresh` | — | `{refreshToken}` | `200 {data: {accessToken, refreshToken}}` | `401` invalid/used/expired |
 | POST | `/api/v1/auth/logout` | — | `{refreshToken}` | `204` | `422` invalid body |
 | GET | `/api/v1/auth/me` | Bearer | — | `200 {data: user}` | `401` |
+| GET | `/api/v1/todos?page=1&limit=20&completed=true` | Bearer | — | `200 {data: todo[], meta: {page, limit, total, totalPages}}` | `401` · `422` bad query |
+| POST | `/api/v1/todos` | Bearer | `{title, dueDate?}` | `201 {data: todo}` | `401` · `422` |
+| GET | `/api/v1/todos/:id` | Bearer | — | `200 {data: todo}` | `401` · `404` · `422` malformed id |
+| PATCH | `/api/v1/todos/:id` | Bearer | any of `{title, completed, dueDate}` | `200 {data: todo}` | `401` · `404` · `422` |
+| DELETE | `/api/v1/todos/:id` | Bearer | — | `204` | `401` · `404` · `422` |
 
 `user` in every response is a DTO: `{id, name, email, createdAt}` — never the password hash or
-internal fields.
+internal fields. `todo` is `{id, title, completed, dueDate, createdAt, updatedAt}` — the `owner`
+field never leaves the server.
+
+### Ownership (BOLA defence)
+
+The owner is **never** read from the request. It comes from the verified access token, and every
+query in `todo.service.ts` includes it:
+
+```ts
+Todo.findOne({ _id: id, owner: ownerId })   // not Todo.findById(id)
+```
+
+A todo that belongs to another user is indistinguishable from a todo that does not exist: the
+API answers `404` for read, update and delete. A `owner` key in the request body is silently
+dropped by the Zod schema, so a client cannot transfer a todo to someone else either.
 
 ### Error envelope
 
@@ -127,6 +163,7 @@ internal fields.
 | 401 | `UNAUTHORIZED` | Missing/invalid/expired token, bad credentials |
 | 404 | `NOT_FOUND` | Unknown route or resource |
 | 409 | `CONFLICT` | Email already registered |
+| 413 | `PAYLOAD_TOO_LARGE` | Request body above the 100 kB cap |
 | 422 | `VALIDATION_ERROR` | Zod rejected the input; `details` maps field → messages |
 | 429 | `TOO_MANY_REQUESTS` | Login/register rate limit exceeded |
 | 500 | `INTERNAL_ERROR` | Unexpected bug — details stay in the server logs |
@@ -145,32 +182,51 @@ internal fields.
 - **Logout** — revokes the refresh-token family. Access tokens remain valid until they expire;
   their short lifetime bounds the exposure.
 
-## Security measures in Lab 1
+## Security measures
 
 | Measure | Where |
 |---|---|
+| **Every todo query filters on `owner` from the token** (BOLA / API1) | `todo.service.ts` |
+| `owner` cannot be chosen by the client (Zod strips unknown keys) | `todo.schemas.ts` |
 | Argon2id hashing, `passwordHash` with `select: false` | `user.model.ts`, `auth.service.ts` |
-| DTOs control what leaves the API | `toUserDto` |
+| DTOs control what leaves the API | `toUserDto`, `toTodoDto` |
 | Zod schemas drop unknown fields (no self-promotion to `admin`) | `auth.schemas.ts` |
 | Generic 500; stack traces only in server logs | `error-handler.ts` |
 | Helmet headers, CORS, 100 kB body cap | `app.ts` |
 | Login/register rate limiting (10 per 15 min in production) | `auth.routes.ts` |
+| Page size capped at 100; malformed ids rejected before MongoDB | `todo.schemas.ts` |
 | Log redaction of `authorization` and `cookie` headers | `logger.ts` |
 | Secrets from environment only; `.env` git-ignored | `.gitignore`, `env.ts` |
 
+Still missing for real production: HTTPS (terminate TLS in front of Node), a restricted
+`CORS_ORIGIN`, email verification and password reset, and monitoring.
+
 ## Verification
 
-Manual, through real HTTP (server must be running):
+### Automated tests
+
+```bash
+npm test          # 9 tests, real HTTP, real test database
+```
+
+| Suite | What it proves |
+|---|---|
+| `auth` | register 201 without password material · duplicate → 409 · unknown email and wrong password return the same 401 · refresh works once, replay revokes the family |
+| `todos` | 401 without a token · full CRUD · trimming, defaults, partial PATCH · 422 on empty title, malformed id, empty patch · pagination + `completed` filter · **user isolation: 404 on read/patch/delete of another user's todo** |
+
+Each test starts from an empty database (`beforeEach(resetDatabase)`), so tests never depend on
+each other or on their order.
+
+### Manual verification
+
+Through real HTTP (server must be running) — 30 checks from Lab 1:
 
 ```bash
 node --env-file=.env scripts/verify-lab1.mjs
 ```
 
-Covers 30 checks: registration, duplicate, validation, login, enumeration, `/me` (missing,
-tampered, expired, wrong-key tokens), malformed JSON, refresh rotation, reuse detection, logout,
-and rate-limit headers. Latest run: **30/30 passed**.
-
-Manual requests are in `requests.http` (VS Code REST Client) or with `curl`:
+Manual requests for every endpoint, including todos, are in `requests.http` (VS Code REST
+Client) or with `curl`:
 
 ```bash
 curl -s -X POST http://localhost:3000/api/v1/auth/register \
@@ -184,12 +240,15 @@ Database checks (hashes, indexes):
 docker exec -it todo-mongo mongosh todo_dev
 ```
 
-Expected: unique index on `users.email`, `$argon2id$…` hash, and in `refreshtokens` a unique
-SHA-256 `tokenHash`, a `family` index and a TTL index on `expiresAt`.
+Expected: unique index on `users.email`, `$argon2id$…` hash, in `refreshtokens` a unique
+SHA-256 `tokenHash`, a `family` index and a TTL index on `expiresAt`, and in `todos` a compound
+index `{owner: 1, createdAt: -1}`.
 
-## Next — Lab 2
+Access-token expiry check (the trick from Lab 2, reused in Lab 4): set `ACCESS_TOKEN_TTL=20s`,
+log in, wait 20 seconds, call `/auth/me` → `401`. The client must then call `/auth/refresh`
+with its refresh token to obtain a new access token. Restore `15m` afterwards.
 
-- `todos` resource with **owner scoping** (BOLA defence): every query filtered by the user id
-  taken from the token.
-- supertest tests through HTTP, including "user B cannot read/modify/delete user A's todo".
-- Security review against the OWASP API risks.
+## Next — Lab 3
+
+The Flutter client: clean architecture (domain / data / presentation), Dio networking,
+secure token storage, go_router guards and Bloc-based authentication.
