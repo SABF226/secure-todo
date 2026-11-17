@@ -1,0 +1,13 @@
+services:
+  mongo:
+    image: mongo:8
+    container_name: todo-mongo
+    restart: unless-stopped
+    ports:
+      # Host port 27018: 27017 is already used by another local container.
+      - "27018:27017"
+    volumes:
+      - todo-mongo-data:/data/db
+
+volumes:
+  todo-mongo-data:
