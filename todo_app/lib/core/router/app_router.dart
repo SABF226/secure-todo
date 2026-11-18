@@ -7,6 +7,9 @@ import 'package:material_ui/material_ui.dart';
 import '../../features/auth/presentation/bloc/auth_bloc.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/register_page.dart';
+import '../../features/todos/presentation/bloc/todo_bloc.dart';
+import '../../features/todos/presentation/pages/todos_page.dart';
+import '../di/injection.dart';
 
 GoRouter createRouter(AuthBloc authBloc) {
   return GoRouter(
@@ -36,18 +39,12 @@ GoRouter createRouter(AuthBloc authBloc) {
         path: '/register',
         builder: (context, state) => const RegisterPage(),
       ),
-      // Temporary route: Lab 4 replaces it with the real todos page.
       GoRoute(
         path: '/todos',
-        builder: (context, state) => Scaffold(
-          appBar: AppBar(title: const Text('Signed in')),
-          body: Center(
-            child: FilledButton(
-              onPressed: () =>
-                  context.read<AuthBloc>().add(const AuthLogoutRequested()),
-              child: const Text('Sign out'),
-            ),
-          ),
+        // The bloc lives exactly as long as this route.
+        builder: (context, state) => BlocProvider(
+          create: (_) => sl<TodoBloc>()..add(const TodosRequested()),
+          child: const TodosPage(),
         ),
       ),
     ],

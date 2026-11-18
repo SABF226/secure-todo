@@ -1,8 +1,8 @@
 # todo_app — Flutter client for the Secure Todo API
 
-Lab 3 of the Advanced Mobile Development course: a Flutter app that can register, sign in,
-stay signed in after a restart and sign out — built with Clean Architecture, BLoC, Dio,
-`go_router` and the device keystore.
+Lab 3–4 of the Advanced Mobile Development course: a Flutter app that can register, sign in,
+stay signed in after a restart, sign out, and manage a todo list with optimistic updates —
+built with Clean Architecture, BLoC, Dio, `go_router` and the device keystore.
 
 The API it talks to is `../todo_api` (Labs 1–2).
 
@@ -53,6 +53,12 @@ lib/
     data/      models/user_model.dart, datasources/auth_remote_data_source.dart,
                repositories/auth_repository_impl.dart
     presentation/  bloc/auth_{bloc,event,state}.dart, pages/login_page.dart, register_page.dart
+  features/todos/
+    domain/    entities/todo.dart, repositories/todo_repository.dart, usecases/todo_usecases.dart
+    data/      models/todo_model.dart, datasources/todo_remote_data_source.dart,
+               repositories/todo_repository_impl.dart
+    presentation/  bloc/todo_{bloc,event,state}.dart, pages/todos_page.dart,
+                   widgets/todo_tile.dart, widgets/add_todo_sheet.dart
 ```
 
 The dependency rule holds: `domain/` imports nothing from Flutter, Dio or JSON; `data/`
@@ -73,11 +79,28 @@ is the only file that knows every layer.
 
 Tokens are never written to `SharedPreferences`: that file is plain text.
 
+## Todos behaviour
+
+| Situation | What happens |
+|---|---|
+| Open `/todos` | the route creates a **new** `TodoBloc` (factory) → `TodosRequested` → `GET /todos?limit=100` |
+| Add | bottom sheet → `POST /todos`, the new todo is put first (the API sorts newest first) |
+| Tick | optimistic: the checkbox flips before the call, `PATCH /todos/:id` confirms or rolls back |
+| Delete (swipe) | optimistic removal, `DELETE /todos/:id`; on failure the todo returns to its exact index |
+| Filter | All / Active / Done, computed from the list (`visibleTodos`), never stored |
+| Title | `My todos (n left)`, rebuilt only when `activeCount` changes (`BlocSelector`) |
+| Pull to refresh | `RefreshIndicator` waits for the first non-`loading` state |
+| Any API error | snackbar with `Failure.message`, shown once (`copyWith` never carries `failure` over) |
+
+Event transformers: `restartable()` for the list (a new refresh cancels the previous one),
+`sequential()` for add/toggle/delete (writes reach the API in the order the user made them),
+and the default `concurrent()` for the filter, which is pure UI state.
+
 ## Tests
 
 ```bash
 flutter analyze     # No issues found!
-flutter test        # 10 tests: 7 bloc + 3 route-guard widget tests, no server, no device
+flutter test        # 25 tests: 7 auth bloc + 10 todo bloc + 3 route guard + 5 todos page
 
 # Integration: the real data layer against the real API (start todo_api first)
 flutter test --dart-define=RUN_INTEGRATION=true
@@ -92,12 +115,28 @@ email → `ServerFailure` (409), short password → `ValidationFailure` with `fi
 refresh after an invalid access token, five concurrent 401s → one refresh, rejected refresh
 token → session cleared, logout offline.
 
+The todos suites:
+
+- `test/features/todos/todo_bloc_test.dart` — the bloc with the real use cases and a mock
+  repository: loading/success/failure, title trimming, optimistic toggle and its rollback,
+  delete rollback at the same index, filter changes, and the `visibleTodos` / `activeCount`
+  getters. The two "Your turn" exercises are included.
+- `test/features/todos/todos_page_test.dart` — the page pumped with the real bloc: title count,
+  the Active filter, an optimistic tick, a swipe that deletes, and a failed tick that rolls back
+  and shows the snackbar.
+- `test/integration/todos_api_test.dart` — real HTTP: add/list ordering, a PATCH that sends only
+  `completed`, delete + 404 on a second delete, empty title → `ValidationFailure`, and object-level
+  authorization (a second account sees nothing, and reading somebody else's todo answers 404).
+
 ## Notes
 
 - `ACCESS_TOKEN_TTL` in `todo_api/.env` is `15m`. If you set it very low (for example `20s`) to
   watch the refresh happen, remember to restore it: every token then dies almost immediately and
   the app spends its life refreshing.
 - Flutter 3.50 moved the Material widgets to `package:material_ui/material_ui.dart`; this project
-  imports that package instead of the deprecated `package:flutter/material.dart`.
-- Lab 4 replaces the temporary `/todos` route (a "Signed in" screen with a sign-out button) with
-  the real todos feature; nothing in `core/` or `features/auth/` should need to change.
+  imports that package instead of the deprecated `package:flutter/material.dart` (the guide's
+  Lab 4 listings still use `flutter/material.dart`, which now emits a deprecation warning).
+- `app_router.dart` reads `sl<TodoBloc>()` inside the route builder, so it imports
+  `core/di/injection.dart`. The Lab 3 guard tests therefore register a `TodoBloc` built on a fake
+  repository in `setUp`; they assert on `TodosPage` instead of the old "Signed in" text.
+- The `/todos` route is now the real page. Nothing else in `core/` or `features/auth/` changed.

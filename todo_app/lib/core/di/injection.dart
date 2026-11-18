@@ -7,6 +7,11 @@ import '../../features/auth/data/repositories/auth_repository_impl.dart';
 import '../../features/auth/domain/repositories/auth_repository.dart';
 import '../../features/auth/domain/usecases/auth_usecases.dart';
 import '../../features/auth/presentation/bloc/auth_bloc.dart';
+import '../../features/todos/data/datasources/todo_remote_data_source.dart';
+import '../../features/todos/data/repositories/todo_repository_impl.dart';
+import '../../features/todos/domain/repositories/todo_repository.dart';
+import '../../features/todos/domain/usecases/todo_usecases.dart';
+import '../../features/todos/presentation/bloc/todo_bloc.dart';
 import '../network/dio_client.dart';
 import '../storage/token_storage.dart';
 
@@ -42,6 +47,25 @@ void configureDependencies() {
       registerUser: sl(),
       getCurrentUser: sl(),
       logoutUser: sl(),
+    ),
+  );
+
+  // ---- Todos feature ----
+  sl.registerLazySingleton(() => TodoRemoteDataSource(sl()));
+  sl.registerLazySingleton<TodoRepository>(() => TodoRepositoryImpl(sl()));
+  sl.registerLazySingleton(() => GetTodos(sl()));
+  sl.registerLazySingleton(() => AddTodo(sl()));
+  sl.registerLazySingleton(() => ToggleTodo(sl()));
+  sl.registerLazySingleton(() => DeleteTodo(sl()));
+
+  // Factory: a NEW TodoBloc each time the todos page is opened
+  // (so a new user never sees the previous user's list).
+  sl.registerFactory(
+    () => TodoBloc(
+      getTodos: sl(),
+      addTodo: sl(),
+      toggleTodo: sl(),
+      deleteTodo: sl(),
     ),
   );
 }
