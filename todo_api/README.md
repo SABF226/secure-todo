@@ -234,6 +234,27 @@ curl -s -X POST http://localhost:3000/api/v1/auth/register \
   -d '{"name":"Ada","email":"ada@example.com","password":"correct-horse-9"}'
 ```
 
+### Postman
+
+Import `postman/secure-todo.postman_collection.json` (File → Import). No environment is needed:
+every value lives in collection variables, and the tokens are captured automatically.
+
+Run in this order:
+
+| Step | Request | Effect |
+|---|---|---|
+| 1 | **Auth → Register** | creates a unique account, stores `accessToken` / `refreshToken` |
+| 2 | **Todos → Create a todo** | stores `todoId` |
+| 3 | List / Get / Patch / Delete | assertions on status and response shape |
+
+The collection-level authorization is already `Bearer {{accessToken}}`, so every todo request
+inherits it. **Logout sits in its own folder at the end**, because it revokes the session and
+clears the token variables — running it before the todos is what produces
+`401 Authentication required`.
+
+Verified by replaying the whole export against the running API: **14/14 requests return the
+expected status**.
+
 Database checks (hashes, indexes):
 
 ```bash

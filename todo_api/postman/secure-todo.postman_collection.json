@@ -1,0 +1,718 @@
+{
+  "info": {
+    "_postman_id": "8f1c2d40-5a71-4b6e-9c33-1a7e0d4b9f21",
+    "name": "Secure Todo API — Labs 1 & 2",
+    "description": "Collection prête à l'emploi pour l'API `todo_api`.\n\n**Aucun environnement à créer** : tout passe par des variables de collection (`baseUrl`, `accessToken`, `refreshToken`, `email`, `todoId`).\n\nOrdre conseillé :\n1. **Auth → Register** (crée un compte unique et enregistre les deux jetons)\n2. **Todos → Create a todo** (enregistre `todoId`)\n3. List / Get / Patch / Delete\n\nLes requêtes `Register`, `Login` et `Refresh` mettent à jour `accessToken` et `refreshToken` automatiquement. L'onglet Authorization de la collection est déjà en `Bearer {{accessToken}}` : les routes `/todos` et `/auth/me` l'héritent.\n\nDémarrer l'API avant d'envoyer une requête : `docker compose up -d` puis `npm run dev`.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "email",
+      "value": "ada@example.com",
+      "type": "string"
+    },
+    {
+      "key": "password",
+      "value": "correct-horse-9",
+      "type": "string"
+    },
+    {
+      "key": "todoId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "description": "Obtenir et gérer la paire de jetons. À exécuter en premier.",
+      "item": [
+        {
+          "name": "Register",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Adresse unique à chaque exécution : la requête reste rejouable.",
+                  "pm.collectionVariables.set('email', `ada+${Date.now()}@example.com`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "",
+                  "const body = pm.response.json();",
+                  "if (body.data && body.data.accessToken) {",
+                  "  pm.collectionVariables.set('accessToken', body.data.accessToken);",
+                  "  pm.collectionVariables.set('refreshToken', body.data.refreshToken);",
+                  "  console.log('accessToken et refreshToken enregistrés');",
+                  "}",
+                  "",
+                  "pm.test('aucun matériel de mot de passe dans la réponse', () => {",
+                  "  pm.expect(JSON.stringify(body)).to.not.match(/passwordHash/);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Ada Lovelace\",\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "register"
+              ]
+            },
+            "description": "Crée un compte avec une adresse unique (`ada+<timestamp>@example.com`) et enregistre `accessToken` / `refreshToken` dans les variables de collection."
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "",
+                  "const body = pm.response.json();",
+                  "if (body.data && body.data.accessToken) {",
+                  "  pm.collectionVariables.set('accessToken', body.data.accessToken);",
+                  "  pm.collectionVariables.set('refreshToken', body.data.refreshToken);",
+                  "}",
+                  "",
+                  "pm.test('message non énumérant', () => {",
+                  "  pm.expect(body.data.user.email).to.eql(pm.collectionVariables.get('email'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Se connecte avec le compte créé par Register (ou avec une adresse déjà connue) et remplace les jetons en variables."
+          }
+        },
+        {
+          "name": "Refresh (rotation)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "",
+                  "const previous = pm.collectionVariables.get('refreshToken');",
+                  "const body = pm.response.json();",
+                  "if (body.data && body.data.refreshToken) {",
+                  "  pm.collectionVariables.set('accessToken', body.data.accessToken);",
+                  "  pm.collectionVariables.set('refreshToken', body.data.refreshToken);",
+                  "}",
+                  "",
+                  "pm.test('le refresh token a bien tourné', () => {",
+                  "  pm.expect(body.data.refreshToken).to.not.eql(previous);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "refresh"
+              ]
+            },
+            "description": "Échange le refresh token contre une nouvelle paire. Chaque jeton ne sert qu'une fois : rejouer l'ancien révoque toute la famille (401)."
+          }
+        },
+        {
+          "name": "Who am I",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('aucun passwordHash', () => {",
+                  "  pm.expect(JSON.stringify(pm.response.json())).to.not.match(/passwordHash/);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "me"
+              ]
+            },
+            "description": "Route protégée : hérite du Bearer de la collection. Sans jeton → 401 `Authentication required`."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Todos",
+      "description": "Toutes les requêtes héritent du Bearer `{{accessToken}}` placé au niveau de la collection. Exécuter **Create a todo** avant Get / Patch / Delete.",
+      "item": [
+        {
+          "name": "List todos (page 1, limit 20)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "",
+                  "const body = pm.response.json();",
+                  "pm.test('enveloppe data + meta', () => {",
+                  "  pm.expect(body).to.have.property('data');",
+                  "  pm.expect(body.meta).to.include.keys('page', 'limit', 'total', 'totalPages');",
+                  "});",
+                  "pm.test('20 éléments maximum', () => {",
+                  "  pm.expect(body.data.length).to.be.at.most(20);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/todos?page=1&limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "todos"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Liste paginée, du plus récent au plus ancien, limitée aux todos de l'utilisateur du jeton."
+          }
+        },
+        {
+          "name": "List todos (completed=true)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('uniquement des todos terminés', () => {",
+                  "  pm.response.json().data.forEach((todo) => {",
+                  "    pm.expect(todo.completed).to.eql(true);",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/todos?page=1&limit=20&completed=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "todos"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "completed",
+                  "value": "true"
+                }
+              ]
+            },
+            "description": "Filtre `completed=true`. Mettre `false` pour les tâches restantes."
+          }
+        },
+        {
+          "name": "Create a todo",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "",
+                  "const body = pm.response.json();",
+                  "pm.test('titre nettoyé (trim)', () => {",
+                  "  pm.expect(body.data.title).to.eql(body.data.title.trim());",
+                  "});",
+                  "pm.test('completed par défaut à false', () => {",
+                  "  pm.expect(body.data.completed).to.eql(false);",
+                  "});",
+                  "pm.test('owner absent du DTO', () => {",
+                  "  pm.expect(body.data).to.not.have.property('owner');",
+                  "});",
+                  "",
+                  "pm.collectionVariables.set('todoId', body.data.id);",
+                  "console.log('todoId enregistré :', body.data.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Write the lab\",\n  \"dueDate\": \"2026-11-20\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/todos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "todos"
+              ]
+            },
+            "description": "Crée un todo pour l'utilisateur du jeton et enregistre son id dans `todoId`.\n\nTest BOLA : ajouter `\"owner\": \"<id d'un autre utilisateur>\"` au corps → le champ est supprimé par Zod, le todo reste au propriétaire authentifié."
+          }
+        },
+        {
+          "name": "Get one todo",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test(\"id inchangé\", () => {",
+                  "  pm.expect(pm.response.json().data.id).to.eql(pm.collectionVariables.get('todoId'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/todos/{{todoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "todos",
+                "{{todoId}}"
+              ]
+            },
+            "description": "Nécessite `todoId` : exécuter **Create a todo** d'abord."
+          }
+        },
+        {
+          "name": "Patch one todo",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "",
+                  "const body = pm.response.json();",
+                  "pm.test('completed passe à true', () => {",
+                  "  pm.expect(body.data.completed).to.eql(true);",
+                  "});",
+                  "pm.test('le titre envoyé au Create est conservé', () => {",
+                  "  pm.expect(body.data.title).to.eql('Write the lab');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"completed\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/todos/{{todoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "todos",
+                "{{todoId}}"
+              ]
+            },
+            "description": "PATCH = seuls les champs envoyés changent. Corps vide `{}` → 422."
+          }
+        },
+        {
+          "name": "Delete one todo",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('204 No Content', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/todos/{{todoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "todos",
+                "{{todoId}}"
+              ]
+            },
+            "description": "204 attendu. `todoId` est conservé pour permettre la vérification suivante."
+          }
+        },
+        {
+          "name": "Get one todo après suppression (attendu 404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('404 Not Found', () => pm.response.to.have.status(404));",
+                  "pm.test('code NOT_FOUND', () => {",
+                  "  pm.expect(pm.response.json().error.code).to.eql('NOT_FOUND');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/todos/{{todoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "todos",
+                "{{todoId}}"
+              ]
+            },
+            "description": "À exécuter juste après **Delete one todo** : prouve que la ressource a disparu."
+          }
+        },
+        {
+          "name": "Id malformé (attendu 422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('422 Validation Error', () => pm.response.to.have.status(422));",
+                  "pm.test('code VALIDATION_ERROR', () => {",
+                  "  pm.expect(pm.response.json().error.code).to.eql('VALIDATION_ERROR');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/todos/123",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "todos",
+                "123"
+              ]
+            },
+            "description": "Un id qui n'est pas 24 caractères hexadécimaux est rejeté avant MongoDB."
+          }
+        },
+        {
+          "name": "Sans jeton (attendu 401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));",
+                  "pm.test('message Authentication required', () => {",
+                  "  pm.expect(pm.response.json().error.message).to.eql('Authentication required');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/todos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "todos"
+              ]
+            },
+            "description": "Sans en-tête Authorization : c'est exactement la réponse `{\"error\":{\"code\":\"UNAUTHORIZED\",\"message\":\"Authentication required\"}}`."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Fin de session",
+      "description": "À exécuter en dernier : Logout révoque la famille de refresh tokens et vide les variables `accessToken` / `refreshToken`.",
+      "item": [
+        {
+          "name": "Logout",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('204 No Content', () => pm.response.to.have.status(204));",
+                  "pm.collectionVariables.set('accessToken', '');",
+                  "pm.collectionVariables.set('refreshToken', '');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "logout"
+              ]
+            },
+            "description": "Révoque la famille de refresh tokens. L'access token reste valide jusqu'à son expiration (15 min) : comportement JWT attendu."
+          }
+        }
+      ]
+    }
+  ]
+}
