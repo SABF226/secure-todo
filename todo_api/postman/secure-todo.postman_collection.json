@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "8f1c2d40-5a71-4b6e-9c33-1a7e0d4b9f21",
     "name": "Secure Todo API — Labs 1 & 2",
-    "description": "Collection prête à l'emploi pour l'API `todo_api`.\n\n**Aucun environnement à créer** : tout passe par des variables de collection (`baseUrl`, `accessToken`, `refreshToken`, `email`, `todoId`).\n\nOrdre conseillé :\n1. **Auth → Register** (crée un compte unique et enregistre les deux jetons)\n2. **Todos → Create a todo** (enregistre `todoId`)\n3. List / Get / Patch / Delete\n\nLes requêtes `Register`, `Login` et `Refresh` mettent à jour `accessToken` et `refreshToken` automatiquement. L'onglet Authorization de la collection est déjà en `Bearer {{accessToken}}` : les routes `/todos` et `/auth/me` l'héritent.\n\nDémarrer l'API avant d'envoyer une requête : `docker compose up -d` puis `npm run dev`.",
+    "description": "Collection prête à l'emploi pour l'API `todo_api`.\n\n**Aucun environnement à créer** : tout passe par des variables de collection (`baseUrl`, `accessToken`, `refreshToken`, `email`, `todoId`).\n\nOrdre conseillé :\n1. **Auth → Register** (crée un compte unique et enregistre les deux jetons)\n2. **Todos → Create a todo** (enregistre `todoId`)\n3. List / Get / Patch / Delete\n\nLes requêtes `Register`, `Login` et `Refresh` mettent à jour `accessToken` et `refreshToken` automatiquement. L'onglet Authorization de la collection est déjà en `Bearer {{accessToken}}` : les routes `/todos` et `/auth/me` l'héritent.\n\nDémarrer l'API avant d'envoyer une requête : `docker compose up -d` puis `npm run dev`.\n\n**Jeton expiré ?** Un script de dossier vérifie `exp` avant chaque requête `/todos` et rafraîchit automatiquement la paire quand c’est nécessaire. La requête **Auth → Diagnostic du jeton (console)** affiche `sub`, `iss`, `aud`, la date d’expiration et le temps restant, et signale un environnement qui masquerait `accessToken`.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -271,12 +271,68 @@
             },
             "description": "Route protégée : hérite du Bearer de la collection. Sans jeton → 401 `Authentication required`."
           }
+        },
+        {
+          "name": "Diagnostic du jeton (console)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Affiche le contenu réel du jeton utilisé, et détecte un masquage par un environnement.",
+                  "const raw = pm.collectionVariables.get('accessToken');",
+                  "const resolved = pm.variables.get('accessToken');",
+                  "const fromEnv = pm.environment.get('accessToken');",
+                  "",
+                  "pm.test('un accessToken est disponible', () => {",
+                  "  pm.expect(Boolean(raw), 'lancer Auth → Register ou Login avant').to.eql(true);",
+                  "});",
+                  "",
+                  "if (fromEnv !== undefined && fromEnv !== raw) {",
+                  "  console.error('Un environnement définit accessToken et masque la variable de collection : vider cette variable ou supprimer l’environnement.');",
+                  "}",
+                  "",
+                  "if (raw && raw.split('.').length === 3) {",
+                  "  const p = JSON.parse(atob(raw.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));",
+                  "  console.log('Jeton utilisé :', {",
+                  "    subject: p.sub,",
+                  "    issuer: p.iss,",
+                  "    audience: p.aud,",
+                  "    expireLe: new Date(p.exp * 1000).toISOString(),",
+                  "    secondesRestantes: Math.round(p.exp - Date.now() / 1000)",
+                  "  });",
+                  "} else {",
+                  "  console.warn('Le jeton n’est pas un JWT à 3 parties : valeur reçue =', raw);",
+                  "}",
+                  "",
+                  "if (resolved !== raw) {",
+                  "  console.warn('Valeur résolue ≠ valeur de collection : un autre scope (environnement, global) prend le dessus.');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": "N’appelle aucune route protégée : elle décode le jeton courant et affiche `exp`, `iss`, `aud` et le temps restant dans la console Postman (View → Show Postman Console). Signale aussi un environnement qui masquerait `accessToken`."
+          }
         }
       ]
     },
     {
       "name": "Todos",
-      "description": "Toutes les requêtes héritent du Bearer `{{accessToken}}` placé au niveau de la collection. Exécuter **Create a todo** avant Get / Patch / Delete.",
+      "description": "Chaque requête hérite du Bearer `{{accessToken}}`. Un script de dossier vérifie la date d’expiration et rafraîchit le jeton automatiquement si besoin.",
       "item": [
         {
           "name": "List todos (page 1, limit 20)",
@@ -654,6 +710,57 @@
               ]
             },
             "description": "Sans en-tête Authorization : c'est exactement la réponse `{\"error\":{\"code\":\"UNAUTHORIZED\",\"message\":\"Authentication required\"}}`."
+          }
+        }
+      ],
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// Vérifie l’access token avant chaque requête /todos.",
+              "// S’il est absent, illisible ou expiré (ou expire dans moins de 10 s), il est rafraîchi.",
+              "const token = pm.collectionVariables.get('accessToken');",
+              "const refresh = pm.collectionVariables.get('refreshToken');",
+              "",
+              "function decode(t) {",
+              "  if (!t || t.split('.').length !== 3) return null;",
+              "  try {",
+              "    const payload = t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');",
+              "    return JSON.parse(atob(payload));",
+              "  } catch (e) {",
+              "    return null;",
+              "  }",
+              "}",
+              "",
+              "const payload = decode(token);",
+              "const remaining = payload && payload.exp ? payload.exp * 1000 - Date.now() : -1;",
+              "",
+              "if (remaining < 10000) {",
+              "  if (!refresh) {",
+              "    console.warn('Aucun refreshToken : exécuter Auth → Register ou Login avant les todos.');",
+              "  } else {",
+              "    pm.sendRequest({",
+              "      url: pm.collectionVariables.get('baseUrl') + '/api/v1/auth/refresh',",
+              "      method: 'POST',",
+              "      header: { 'Content-Type': 'application/json' },",
+              "      body: { mode: 'raw', raw: JSON.stringify({ refreshToken: refresh }) }",
+              "    }, (err, res) => {",
+              "      if (err || res.code !== 200) {",
+              "        console.error('Rafraîchissement impossible : se reconnecter avec Auth → Login.');",
+              "        return;",
+              "      }",
+              "      const data = res.json().data;",
+              "      pm.collectionVariables.set('accessToken', data.accessToken);",
+              "      pm.collectionVariables.set('refreshToken', data.refreshToken);",
+              "      console.log('Access token expiré : rafraîchi automatiquement.');",
+              "    });",
+              "  }",
+              "} else {",
+              "  console.log('Access token valide encore ' + Math.round(remaining / 1000) + ' s.');",
+              "}"
+            ]
           }
         }
       ]

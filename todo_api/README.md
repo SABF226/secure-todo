@@ -252,6 +252,16 @@ inherits it. **Logout sits in its own folder at the end**, because it revokes th
 clears the token variables — running it before the todos is what produces
 `401 Authentication required`.
 
+A folder-level pre-request script on **Todos** decodes the access token and, when it is missing
+or expires within 10 seconds, refreshes the pair automatically. If something still fails,
+**Auth → Diagnostic du jeton (console)** prints the token's `sub`, `iss`, `aud`, expiry date and
+remaining seconds in the Postman Console, and warns when an environment variable shadows
+`accessToken`.
+
+> `401 Invalid or expired access token` means the header was received but the token failed
+> verification: expired, signed with another secret (server run with a different `.env`),
+> refresh token used instead of the access token, or a literal unresolved `{{accessToken}}`.
+
 Verified by replaying the whole export against the running API: **14/14 requests return the
 expected status**.
 
