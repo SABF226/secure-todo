@@ -19,28 +19,44 @@ class TodoTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
     return Dismissible(
       key: ValueKey(todo.id),
       direction: DismissDirection.endToStart,
       onDismissed: (_) => onDelete(),
       background: Container(
-        color: theme.colorScheme.errorContainer,
+        decoration: BoxDecoration(
+          color: scheme.errorContainer,
+          borderRadius: BorderRadius.circular(18),
+        ),
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: Icon(Icons.delete, color: theme.colorScheme.onErrorContainer),
+        child: Icon(
+          Icons.delete_outline_rounded,
+          color: scheme.onErrorContainer,
+        ),
       ),
-      child: CheckboxListTile(
-        value: todo.completed,
-        onChanged: (_) => onToggle(),
-        controlAffinity: ListTileControlAffinity.leading,
-        title: Text(
-          todo.title,
-          style: todo.completed
-              ? TextStyle(
-                  decoration: TextDecoration.lineThrough,
-                  color: theme.colorScheme.outline,
-                )
-              : null,
+      child: Card(
+        child: CheckboxListTile(
+          value: todo.completed,
+          onChanged: (_) => onToggle(),
+          controlAffinity: ListTileControlAffinity.leading,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 4,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
+          title: Text(
+            todo.title,
+            style: theme.textTheme.titleMedium?.copyWith(
+              decoration: todo.completed ? TextDecoration.lineThrough : null,
+              decorationColor: scheme.outline,
+              color: todo.completed ? scheme.outline : scheme.onSurface,
+            ),
+          ),
         ),
       ),
     );

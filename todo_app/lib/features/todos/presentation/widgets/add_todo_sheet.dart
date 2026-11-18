@@ -34,30 +34,44 @@ class _AddTodoSheetState extends State<AddTodoSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Padding(
       padding: EdgeInsets.fromLTRB(
         24,
-        24,
+        4,
         24,
         24 + MediaQuery.viewInsetsOf(context).bottom,
       ),
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: TextField(
-              controller: _controller,
-              autofocus: true,
-              maxLength: 200,
-              textCapitalization: TextCapitalization.sentences,
-              decoration: const InputDecoration(
-                hintText: 'What needs to be done?',
-                counterText: '',
+          Text('New todo', style: theme.textTheme.titleLarge),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _controller,
+                  autofocus: true,
+                  maxLength: 200,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: const InputDecoration(
+                    hintText: 'What needs to be done?',
+                    counterText: '',
+                  ),
+                  onSubmitted: (_) => _submit(),
+                ),
               ),
-              onSubmitted: (_) => _submit(),
-            ),
+              const SizedBox(width: 12),
+              IconButton.filled(
+                onPressed: _submit,
+                tooltip: 'Add',
+                icon: const Icon(Icons.add_rounded),
+              ),
+            ],
           ),
-          const SizedBox(width: 12),
-          IconButton.filled(onPressed: _submit, icon: const Icon(Icons.check)),
         ],
       ),
     );

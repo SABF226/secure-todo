@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../bloc/auth_bloc.dart';
+import '../widgets/auth_header.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -15,6 +16,8 @@ class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
   final _email = TextEditingController();
   final _password = TextEditingController();
+  // Purely visual state: whether the password is hidden.
+  bool _obscure = true;
 
   @override
   void dispose() {
@@ -33,8 +36,9 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Sign in')),
       // listener: one-off side effects (snackbar). builder: the UI.
       body: BlocConsumer<AuthBloc, AuthState>(
         listenWhen: (previous, current) =>
@@ -47,43 +51,85 @@ class _LoginPageState extends State<LoginPage> {
         },
         builder: (context, state) {
           final loading = state is AuthLoading;
-          return Form(
-            key: _formKey,
+          return SafeArea(
             child: ListView(
-              padding: const EdgeInsets.all(24),
+              padding: EdgeInsets.zero,
               children: [
-                TextFormField(
-                  controller: _email,
-                  keyboardType: TextInputType.emailAddress,
-                  autofillHints: const [AutofillHints.email],
-                  decoration: const InputDecoration(labelText: 'Email'),
-                  validator: (value) => value != null && value.contains('@')
-                      ? null
-                      : 'Enter a valid email',
+                const AuthHeader(
+                  title: 'Welcome back',
+                  subtitle: 'Sign in to pick up your list where you left it.',
                 ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _password,
-                  obscureText: true,
-                  decoration: const InputDecoration(labelText: 'Password'),
-                  validator: (value) => value != null && value.isNotEmpty
-                      ? null
-                      : 'Enter your password',
-                  onFieldSubmitted: (_) => _submit(),
-                ),
-                const SizedBox(height: 24),
-                FilledButton(
-                  onPressed: loading ? null : _submit,
-                  child: loading
-                      ? const SizedBox.square(
-                          dimension: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('Sign in'),
-                ),
-                TextButton(
-                  onPressed: loading ? null : () => context.go('/register'),
-                  child: const Text('No account yet? Create one'),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        TextFormField(
+                          controller: _email,
+                          keyboardType: TextInputType.emailAddress,
+                          autofillHints: const [AutofillHints.email],
+                          textInputAction: TextInputAction.next,
+                          decoration: const InputDecoration(
+                            labelText: 'Email',
+                            prefixIcon: Icon(Icons.alternate_email_rounded),
+                          ),
+                          validator: (value) =>
+                              value != null && value.contains('@')
+                              ? null
+                              : 'Enter a valid email',
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _password,
+                          obscureText: _obscure,
+                          textInputAction: TextInputAction.done,
+                          decoration: InputDecoration(
+                            labelText: 'Password',
+                            prefixIcon: const Icon(Icons.lock_outline_rounded),
+                            suffixIcon: IconButton(
+                              tooltip: _obscure
+                                  ? 'Show password'
+                                  : 'Hide password',
+                              onPressed: () =>
+                                  setState(() => _obscure = !_obscure),
+                              icon: Icon(
+                                _obscure
+                                    ? Icons.visibility_rounded
+                                    : Icons.visibility_off_rounded,
+                              ),
+                            ),
+                          ),
+                          validator: (value) =>
+                              value != null && value.isNotEmpty
+                              ? null
+                              : 'Enter your password',
+                          onFieldSubmitted: (_) => _submit(),
+                        ),
+                        const SizedBox(height: 28),
+                        FilledButton(
+                          onPressed: loading ? null : _submit,
+                          child: loading
+                              ? SizedBox.square(
+                                  dimension: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: scheme.onPrimary,
+                                  ),
+                                )
+                              : const Text('Sign in'),
+                        ),
+                        const SizedBox(height: 8),
+                        TextButton(
+                          onPressed: loading
+                              ? null
+                              : () => context.go('/register'),
+                          child: const Text('No account yet? Create one'),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ],
             ),

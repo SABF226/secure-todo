@@ -10,6 +10,7 @@ import '../../features/auth/presentation/pages/register_page.dart';
 import '../../features/todos/presentation/bloc/todo_bloc.dart';
 import '../../features/todos/presentation/pages/todos_page.dart';
 import '../di/injection.dart';
+import '../widgets/splash_screen.dart';
 
 GoRouter createRouter(AuthBloc authBloc) {
   return GoRouter(
@@ -31,8 +32,7 @@ GoRouter createRouter(AuthBloc authBloc) {
     routes: [
       GoRoute(
         path: '/splash',
-        builder: (context, state) =>
-            const Scaffold(body: Center(child: CircularProgressIndicator())),
+        builder: (context, state) => const SplashScreen(),
       ),
       GoRoute(path: '/login', builder: (context, state) => const LoginPage()),
       GoRoute(

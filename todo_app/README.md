@@ -39,6 +39,8 @@ lib/
   app.dart                   MaterialApp.router + theme
   core/
     config/app_config.dart   API_BASE_URL from --dart-define
+    theme/app_theme.dart     brand purple, Material 3 light + dark, component styles
+    widgets/                 AppLogo, SplashScreen (the only shared dumb widgets)
     error/failure.dart       sealed Failure (network, unauthorized, validation, server)
     result/result.dart       sealed Result<T> = Ok<T> | Err<T>
     network/error_mapper.dart  guard() + mapDioException(): Dio -> Failure, once
@@ -52,7 +54,8 @@ lib/
     domain/    entities/user.dart, repositories/auth_repository.dart, usecases/auth_usecases.dart
     data/      models/user_model.dart, datasources/auth_remote_data_source.dart,
                repositories/auth_repository_impl.dart
-    presentation/  bloc/auth_{bloc,event,state}.dart, pages/login_page.dart, register_page.dart
+    presentation/  bloc/auth_{bloc,event,state}.dart, pages/login_page.dart, register_page.dart,
+                   widgets/auth_header.dart
   features/todos/
     domain/    entities/todo.dart, repositories/todo_repository.dart, usecases/todo_usecases.dart
     data/      models/todo_model.dart, datasources/todo_remote_data_source.dart,
@@ -95,6 +98,31 @@ Tokens are never written to `SharedPreferences`: that file is plain text.
 Event transformers: `restartable()` for the list (a new refresh cancels the previous one),
 `sequential()` for add/toggle/delete (writes reach the API in the order the user made them),
 and the default `concurrent()` for the filter, which is pure UI state.
+
+## Look and feel
+
+The whole visual identity lives in `lib/core/theme/app_theme.dart`. One seed colour —
+`#7C3AED` — feeds `ColorScheme.fromSeed`, so every role (primary, containers, outlines,
+surface tints) is derived instead of hard-coded, and a light **and** dark theme come out of
+the same code. `MaterialApp` uses `ThemeMode.system`, so the app follows the OS. There is no
+theme state to persist yet: adding a `ThemeCubit` later would not touch this file.
+
+Component styles set once in the theme, so pages stay readable:
+
+| Component | Choice |
+|---|---|
+| Cards | no elevation, hairline outline, 18 px radius, `surfaceContainerLow` |
+| Text fields | filled, borderless until focus, then a 1.6 px purple border |
+| Buttons | 52 px minimum height, 16 px radius, bold label |
+| Filter bar | full-width `SegmentedButton`, selected segment filled purple |
+| Checkbox | circular, filled purple when checked |
+| FAB | extended "New todo", purple, 18 px radius |
+| Snackbar | floating, rounded, inverse surface |
+| Bottom sheet | 28 px top radius + drag handle |
+
+Pages only use scheme tokens (`colorScheme.primary`, `onSurfaceVariant`, …), so dark mode needed
+no page-level branch. The sign-in/sign-up pages share a purple gradient header (`AuthHeader`),
+show/hide password buttons, and keep every validator and bloc call unchanged.
 
 ## Tests
 
@@ -140,3 +168,6 @@ The todos suites:
   `core/di/injection.dart`. The Lab 3 guard tests therefore register a `TodoBloc` built on a fake
   repository in `setUp`; they assert on `TodosPage` instead of the old "Signed in" text.
 - The `/todos` route is now the real page. Nothing else in `core/` or `features/auth/` changed.
+- The purple theme arrived *after* the labs: it is presentation only (`core/theme/`,
+  `core/widgets/`, auth header, page layouts). No bloc, use case, repository, DI registration or
+  route guard was modified, and the 25 unit/widget tests pass untouched.
