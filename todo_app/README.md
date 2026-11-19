@@ -51,6 +51,8 @@ lib/
     config/app_config.dart   API_BASE_URL from --dart-define
     theme/app_theme.dart     brand purple, Material 3 light + dark, component styles
     widgets/                 AppLogo, SplashScreen (the only shared dumb widgets)
+  assets/branding/           three source SVGs for the launcher/web/iOS icons
+  tool/generate_icons.sh     rasterises those SVGs to every required size
     error/failure.dart       sealed Failure (network, unauthorized, validation, server)
     result/result.dart       sealed Result<T> = Ok<T> | Err<T>
     network/error_mapper.dart  guard() + mapDioException(): Dio -> Failure, once
@@ -137,6 +139,31 @@ Pages only use scheme tokens (`colorScheme.primary`, `onSurfaceVariant`, …), s
 no page-level branch. The sign-in/sign-up pages share a soft lavender header (`AuthHeader`) that
 fades into the page background, show/hide password buttons, and keep every validator and bloc
 call unchanged.
+
+## Branding
+
+The launcher icon is generated from `assets/branding/`:
+
+| SVG | Used for |
+|---|---|
+| `app_icon.svg` | rounded purple square — Android legacy, web `any` icons, favicon |
+| `app_icon_foreground.svg` | transparent check only — Android adaptive foreground (inside the 66 dp safe circle) |
+| `app_icon_maskable.svg` | full-bleed square — iOS (the OS rounds it) and web maskable icons |
+
+```bash
+./tool/generate_icons.sh     # needs Inkscape; rewrites every PNG below
+```
+
+It writes the five Android densities (`ic_launcher.png`, `ic_launcher_foreground.png`,
+`ic_launcher_monochrome.png`), all fifteen iOS `AppIcon` sizes (flattened, no alpha channel —
+the App Store rejects alpha), `web/favicon.png` and the four `web/icons/*.png`.
+The adaptive icon XML (`mipmap-anydpi-v26` / `-v33` with the Android 13 themed `monochrome`
+layer) and the `#7C3AED` background drawable are static files.
+
+To use your own artwork, replace the three SVGs keeping the same canvas sizes (or just
+`app_icon.svg` if you only care about Android/web) and re-run the script: nothing else refers
+to the old drawings. The in-app `AppLogo` widget draws its glyph with `Icon`, not the SVG, so it
+is independent of these files — at 48 px a single bold check reads better than a checklist.
 
 ## Tests
 

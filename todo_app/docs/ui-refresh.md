@@ -155,7 +155,38 @@ toujours glissée, le rollback et la `SnackBar` toujours vérifiés.
 
 ---
 
-## 8. Piste suivante
+## 8. Icône du lanceur (marque)
+
+L'icône par défaut de Flutter est remplacée par la marque de l'application. Le SVG n'est **pas**
+utilisé directement (ni Android ni iOS ne le lisent) : il sert de source, rasterisée à toutes les
+tailles par `tool/generate_icons.sh` (Inkscape).
+
+| Source | Usage |
+|---|---|
+| `assets/branding/app_icon.svg` | carré violet arrondi — Android legacy, icônes web `any`, favicon |
+| `assets/branding/app_icon_foreground.svg` | le check seul, transparent — avant-plan de l'icône adaptative |
+| `assets/branding/app_icon_maskable.svg` | carré plein bord — iOS (le système arrondit) et web `maskable` |
+
+Produits : 5 densités Android (`ic_launcher`, `ic_launcher_foreground`, `ic_launcher_monochrome`),
+15 tailles iOS, `favicon.png` et les 4 icônes web.
+
+Deux détails qui font échouer les builds si on les oublie :
+
+1. **iOS refuse le canal alpha.** Les PNG sont aplatis (`-alpha remove -alpha off`) ; un 1024×1024
+   RGBA, même entièrement opaque, est rejeté par l'App Store.
+2. **`monochrome` n'existe qu'à partir de l'API 33.** Il est déclaré dans
+   `mipmap-anydpi-v33/ic_launcher.xml` ; la variante `-v26` ne contient que fond + avant-plan,
+   sinon les appareils Android 8–12 lisent un attribut inconnu.
+
+Le label du lanceur passe aussi à « Secure Todo » (`android:label`, `CFBundleDisplayName`,
+`manifest.json`), et la couleur de thème web à `#7C3AED`.
+
+Pour mettre votre propre logo : remplacez les SVG (mêmes dimensions de canevas), relancez
+`./tool/generate_icons.sh`, réinstallez. Aucun autre fichier ne référence le dessin.
+
+---
+
+## 9. Piste suivante
 
 Le mode sombre existe mais n'est pas exposé. Pour laisser l'utilisateur choisir (et s'en souvenir),
 il suffit d'ajouter un `ThemeCubit` + `hydrated_bloc` et de passer `themeMode` à
