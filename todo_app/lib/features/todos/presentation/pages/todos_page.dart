@@ -25,14 +25,11 @@ class TodosPage extends StatelessWidget {
           padding: EdgeInsets.only(left: 20),
           child: Center(child: AppLogo(size: 34)),
         ),
-        // BlocSelector rebuilds ONLY when the selected value changes.
-        title: BlocSelector<TodoBloc, TodoState, int>(
-          selector: (state) => state.activeCount,
-          builder: (context, count) => Text('My todos ($count left)'),
-        ),
+        title: const Text('My todos'),
         actions: [
+          const Center(child: _RemainingPill()),
           Padding(
-            padding: const EdgeInsets.only(right: 12),
+            padding: const EdgeInsets.only(left: 8, right: 12),
             child: IconButton.filledTonal(
               tooltip: 'Sign out',
               icon: const Icon(Icons.logout_rounded),
@@ -49,8 +46,9 @@ class TodosPage extends StatelessWidget {
       ),
       body: Column(
         children: [
+          const _CompletionSummary(),
           const Padding(
-            padding: EdgeInsets.fromLTRB(16, 4, 16, 12),
+            padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
             child: _FilterBar(),
           ),
           Expanded(
@@ -63,11 +61,115 @@ class TodosPage extends StatelessWidget {
                     SnackBar(content: Text(state.failure!.message)),
                   );
               },
-              builder: (context, state) => _TodoList(state: state),
+              // Cross-fade between loading, empty and list states.
+              builder: (context, state) => AnimatedSwitcher(
+                duration: const Duration(milliseconds: 250),
+                switchInCurve: Curves.easeOut,
+                switchOutCurve: Curves.easeIn,
+                child: _TodoList(
+                  key: ValueKey(
+                    '${state.status.name}-${state.visibleTodos.isEmpty}',
+                  ),
+                  state: state,
+                ),
+              ),
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+/// How many todos are left, right in the app bar.
+class _RemainingPill extends StatelessWidget {
+  const _RemainingPill();
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    // BlocSelector rebuilds ONLY when the selected value changes.
+    return BlocSelector<TodoBloc, TodoState, int>(
+      selector: (state) => state.activeCount,
+      builder: (context, count) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: scheme.primaryContainer,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Text(
+          '$count left',
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+            color: scheme.onPrimaryContainer,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A quiet progress line: "1 of 3 done" plus the ratio.
+class _CompletionSummary extends StatelessWidget {
+  const _CompletionSummary();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    // One record selector: no rebuild unless the two numbers change.
+    return BlocSelector<TodoBloc, TodoState, (int, int)>(
+      selector: (state) =>
+          (state.todos.length - state.activeCount, state.todos.length),
+      builder: (context, value) {
+        final (done, total) = value;
+        if (total == 0) return const SizedBox.shrink();
+        final ratio = done / total;
+
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    '$done of $total done',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    '${(ratio * 100).round()}%',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: scheme.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(999),
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0, end: ratio),
+                  duration: const Duration(milliseconds: 350),
+                  curve: Curves.easeOutCubic,
+                  builder: (context, animated, _) => LinearProgressIndicator(
+                    value: animated,
+                    minHeight: 8,
+                    backgroundColor: scheme.surfaceContainerHighest,
+                    color: scheme.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -79,7 +181,7 @@ class _FilterBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final filter = context.select((TodoBloc bloc) => bloc.state.filter);
     return SegmentedButton<TodoFilter>(
-      // Full width: three equal segments under the app bar.
+      // Full width: three equal segments under the summary.
       expandedInsets: EdgeInsets.zero,
       showSelectedIcon: false,
       segments: const [
@@ -107,7 +209,7 @@ class _FilterBar extends StatelessWidget {
 }
 
 class _TodoList extends StatelessWidget {
-  const _TodoList({required this.state});
+  const _TodoList({required this.state, super.key});
 
   final TodoState state;
 
@@ -160,6 +262,7 @@ class _TodoList extends StatelessWidget {
   }
 }
 
+/// A soft purple disc around the icon: no image asset needed.
 class _EmptyState extends StatelessWidget {
   const _EmptyState({required this.filter});
 
@@ -189,10 +292,27 @@ class _EmptyState extends StatelessWidget {
 
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(32, 88, 32, 32),
+      padding: const EdgeInsets.fromLTRB(32, 64, 32, 32),
       children: [
-        Icon(icon, size: 52, color: scheme.primary),
-        const SizedBox(height: 18),
+        Center(
+          child: Container(
+            width: 132,
+            height: 132,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  scheme.primaryContainer,
+                  scheme.primaryContainer.withValues(alpha: 0.25),
+                ],
+              ),
+            ),
+            child: Icon(icon, size: 52, color: scheme.primary),
+          ),
+        ),
+        const SizedBox(height: 24),
         Text(
           title,
           textAlign: TextAlign.center,

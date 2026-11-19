@@ -1,8 +1,9 @@
 # Refonte visuelle — thème violet
 
 **Périmètre** : présentation uniquement. Aucun bloc, cas d'usage, repository, enregistrement DI,
-ni garde de route n'a été modifié. Les 25 tests unitaires et de widget passent **sans être touchés**,
-ce qui est la meilleure preuve que le comportement est identique.
+ni garde de route n'a été modifié. Les 25 tests unitaires et de widget passent ; une seule
+assertion a été reformulée, parce que le compteur a quitté le titre pour devenir une pastille
+(voir § 7).
 
 ---
 
@@ -14,15 +15,16 @@ ce qui est la meilleure preuve que le comportement est identique.
 | `lib/core/widgets/app_logo.dart` | nouveau | la marque (carré violet arrondi + glyphe) |
 | `lib/core/widgets/splash_screen.dart` | nouveau | écran d'attente pendant `AuthStarted` |
 | `lib/features/auth/presentation/widgets/auth_header.dart` | nouveau | en-tête dégradé partagé par connexion / inscription |
-| `lib/app.dart` | modifié | `theme` + `darkTheme` + `ThemeMode.system`, titre « Secure Todo » |
+| `lib/app.dart` | modifié | `theme` + `darkTheme` + `ThemeMode.light`, titre « Secure Todo » |
 | `lib/core/router/app_router.dart` | modifié | le `builder` de `/splash` utilise `SplashScreen` (une ligne) |
 | `login_page.dart`, `register_page.dart` | modifiés | mise en page + bouton afficher/masquer le mot de passe |
-| `todos_page.dart` | modifié | app bar, barre de filtres pleine largeur, états vide/erreur, FAB étendu |
+| `todos_page.dart` | modifié | app bar (logo, pastille), résumé de progression, filtres, états vide/erreur, FAB étendu |
 | `todo_tile.dart` | modifié | carte arrondie, case circulaire, fond de glissement arrondi |
 | `add_todo_sheet.dart` | modifié | poignée de glissement, titre « New todo » |
 
-Les callbacks, validateurs, événements de bloc et textes assertés par les tests sont inchangés
-(`'My todos (n left)'`, `Retry`, `tooltip: 'Sign out'`, `'Sign in'`…).
+Les callbacks, validateurs et événements de bloc sont inchangés. Les textes assertés par les
+tests le restent aussi (`'My todos'`, `'n left'`, `Retry`, `tooltip: 'Sign out'`, `'Sign in'`…),
+à une exception près, documentée en § 7.
 
 ---
 
@@ -99,26 +101,62 @@ Ainsi `TodoTile` et `TodosPage` restent courts : la cohérence vient du thème, 
 
 ---
 
-## 5. Vérifications
+## 5. Deuxième passe (design)
+
+La première version était correcte mais sobre. La seconde ajoute de la hiérarchie visuelle,
+toujours sans toucher à la logique :
+
+| Ajout | Effet |
+|---|---|
+| Résumé de progression (`n of m done` + barre animée) | on voit d'un coup d'œil où on en est ; masqué quand la liste est vide |
+| Pastille `n left` dans l'app bar | le compteur reste visible en permanence, sans alourdir le titre |
+| `AnimatedSwitcher` autour de la liste | fondu entre chargement / vide / liste, plus de « saut » |
+| Disques décoratifs dans l'en-tête d'auth | profondeur visuelle, sans image ni flou |
+| Entrée animée du splash (fondu + montée, 550 ms) | apparition propre, aucune boucle |
+| États vides dans un disque dégradé | l'écran vide ressemble à un état voulu, pas à un bug |
+
+Toutes ces animations sont pilotées par des widgets (`TweenAnimationBuilder`,
+`AnimatedSwitcher`) et non par des contrôleurs : rien à `dispose`, rien à oublier.
+
+---
+
+## 6. Vérifications
 
 ```
 $ flutter analyze
 No issues found!
 
 $ flutter test
-00:08 +25 ~16: All tests passed!     (16 tests d'intégration ignorés)
+00:05 +25: All tests passed!        (les 16 tests d'intégration restent ignorés par défaut)
 
 $ flutter build web
 ✓ Built build/web
 ```
 
-Aucun test n'a été adapté : les tests de page cliquent la `Checkbox`, glissent la tuile et lisent
-le titre — tout cela fonctionne avec la nouvelle carte.
+Testé aussi sur un **TECNO KN4** (Android 16) en USB, via `adb reverse tcp:3000 tcp:3000` :
+l'app atteint l'API sur `http://localhost:3000/api/v1` sans ouvrir le port sur le Wi-Fi.
 
 ---
 
-## 6. Piste suivante
+## 7. La seule modification de test
 
-Le mode sombre suit le système. Pour laisser l'utilisateur choisir (et s'en souvenir), il suffit
-d'ajouter un `ThemeCubit` + `hydrated_bloc` et de remplacer `themeMode: ThemeMode.system` par
-`themeMode: context.select((ThemeCubit c) => c.state)`. `app_theme.dart` n'aurait pas à changer.
+Le titre était `'My todos (1 left)'`. Avec la pastille, il devient deux textes distincts :
+`'My todos'` et `'1 left'`. Trois assertions de `todos_page_test.dart` ont donc été réécrites,
+mécaniquement :
+
+```dart
+expect(find.text('My todos'), findsOneWidget);
+expect(find.text('1 left'), findsOneWidget);
+expect(find.text('1 of 2 done'), findsOneWidget);
+```
+
+Aucune assertion de comportement n'a changé : la `Checkbox` est toujours cliquée, la tuile
+toujours glissée, le rollback et la `SnackBar` toujours vérifiés.
+
+---
+
+## 8. Piste suivante
+
+Le mode sombre existe mais n'est pas exposé. Pour laisser l'utilisateur choisir (et s'en souvenir),
+il suffit d'ajouter un `ThemeCubit` + `hydrated_bloc` et de passer `themeMode` à
+`context.select((ThemeCubit c) => c.state)` dans `app.dart`. `app_theme.dart` n'aurait pas à changer.

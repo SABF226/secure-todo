@@ -101,7 +101,9 @@ Tokens are never written to `SharedPreferences`: that file is plain text.
 | Tick | optimistic: the checkbox flips before the call, `PATCH /todos/:id` confirms or rolls back |
 | Delete (swipe) | optimistic removal, `DELETE /todos/:id`; on failure the todo returns to its exact index |
 | Filter | All / Active / Done, computed from the list (`visibleTodos`), never stored |
-| Title | `My todos (n left)`, rebuilt only when `activeCount` changes (`BlocSelector`) |
+| Title | `My todos`, rebuilt only when `activeCount` changes (`BlocSelector`) |
+| Remaining count | purple pill `n left` in the app bar, same `BlocSelector` |
+| Progress | `n of m done` + animated bar, hidden while the list is empty |
 | Pull to refresh | `RefreshIndicator` waits for the first non-`loading` state |
 | Any API error | snackbar with `Failure.message`, shown once (`copyWith` never carries `failure` over) |
 
@@ -182,4 +184,6 @@ The todos suites:
 - The `/todos` route is now the real page. Nothing else in `core/` or `features/auth/` changed.
 - The purple theme arrived *after* the labs: it is presentation only (`core/theme/`,
   `core/widgets/`, auth header, page layouts). No bloc, use case, repository, DI registration or
-  route guard was modified, and the 25 unit/widget tests pass untouched.
+  route guard was modified. The one test edit is cosmetic: the page test string
+  `'My todos (1 left)'` became `'My todos'` + `'1 left'`, because the count now sits in its
+  own pill next to the title.

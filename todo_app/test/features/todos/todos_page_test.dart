@@ -74,10 +74,12 @@ void main() {
     return bloc;
   }
 
-  testWidgets('the title counts the remaining todos only', (tester) async {
+  testWidgets('the header counts the remaining todos only', (tester) async {
     await pumpPage(tester);
 
-    expect(find.text('My todos (1 left)'), findsOneWidget);
+    expect(find.text('My todos'), findsOneWidget);
+    expect(find.text('1 left'), findsOneWidget);
+    expect(find.text('1 of 2 done'), findsOneWidget);
     expect(find.text('Buy milk'), findsOneWidget);
     expect(find.text('Buy bread'), findsOneWidget);
   });
@@ -102,7 +104,8 @@ void main() {
     await tester.tap(find.byType(Checkbox).first);
     await tester.pump(); // optimistic emission, before the API answers
 
-    expect(find.text('My todos (0 left)'), findsOneWidget);
+    expect(find.text('0 left'), findsOneWidget);
+    expect(find.text('2 of 2 done'), findsOneWidget);
     verify(() => repository.updateTodo('1', completed: true)).called(1);
   });
 
@@ -130,7 +133,8 @@ void main() {
     await tester.pump(); // failure + snackbar
 
     expect(find.text('Buy milk'), findsOneWidget);
-    expect(find.text('My todos (1 left)'), findsOneWidget);
+    expect(find.text('1 left'), findsOneWidget);
+    expect(find.text('1 of 2 done'), findsOneWidget);
     expect(
       find.text('Cannot reach the server. Check your connection.'),
       findsOneWidget,
