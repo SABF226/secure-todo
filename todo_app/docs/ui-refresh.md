@@ -42,15 +42,21 @@ static const Color seed = Color(0xFF7C3AED); // violet
 - changer la marque plus tard = changer une ligne ;
 - le contraste texte/fond est garanti par Material, pas à l'œil.
 
-Le seul dégradé fixe est celui de l'en-tête d'authentification, construit à partir de `primary`
-et `secondary` :
+L'application démarre en **thème clair** (`themeMode: ThemeMode.light`). Le schéma sombre est
+construit et prêt, mais n'est pas imposé par le réglage du téléphone : il suffit de passer à
+`ThemeMode.system` dans `app.dart` pour le réactiver.
+
+L'en-tête d'authentification n'est plus un bloc violet saturé : c'est un lavis
+`primaryContainer` qui se fond dans le fond de page.
 
 ```dart
-final end = Color.lerp(scheme.primary, scheme.secondary, 0.65)!;
+colors: [
+  scheme.primaryContainer.withValues(alpha: 0.75),
+  scheme.surface,
+]
 ```
 
-Il reste dans la famille du `primary`, donc le texte `onPrimary` reste lisible dans les deux
-modes — c'est le piège classique d'un dégradé qui part vers `tertiary`.
+La marque reste lisible (pastille `primary` + mot-clé violet) sans assombrir le haut de l'écran.
 
 ---
 

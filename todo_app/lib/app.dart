@@ -29,8 +29,10 @@ class _TodoAppState extends State<TodoApp> {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
-      // UI only: no user preference to store, the OS decides.
-      themeMode: ThemeMode.system,
+      // Light by default: the dark scheme stays available (set this to
+      // ThemeMode.system, or wire a ThemeCubit) but it is opt-in, not
+      // imposed by the phone's system setting.
+      themeMode: ThemeMode.light,
       routerConfig: _router,
     );
   }

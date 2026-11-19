@@ -104,8 +104,9 @@ and the default `concurrent()` for the filter, which is pure UI state.
 The whole visual identity lives in `lib/core/theme/app_theme.dart`. One seed colour —
 `#7C3AED` — feeds `ColorScheme.fromSeed`, so every role (primary, containers, outlines,
 surface tints) is derived instead of hard-coded, and a light **and** dark theme come out of
-the same code. `MaterialApp` uses `ThemeMode.system`, so the app follows the OS. There is no
-theme state to persist yet: adding a `ThemeCubit` later would not touch this file.
+the same code. The app runs **light by default** (`themeMode: ThemeMode.light`): the dark
+scheme is built and ready, but it is not imposed by the phone's system setting. Switching to
+`ThemeMode.system`, or wiring a `ThemeCubit`, is a one-line change in `app.dart`.
 
 Component styles set once in the theme, so pages stay readable:
 
@@ -121,8 +122,9 @@ Component styles set once in the theme, so pages stay readable:
 | Bottom sheet | 28 px top radius + drag handle |
 
 Pages only use scheme tokens (`colorScheme.primary`, `onSurfaceVariant`, …), so dark mode needed
-no page-level branch. The sign-in/sign-up pages share a purple gradient header (`AuthHeader`),
-show/hide password buttons, and keep every validator and bloc call unchanged.
+no page-level branch. The sign-in/sign-up pages share a soft lavender header (`AuthHeader`) that
+fades into the page background, show/hide password buttons, and keep every validator and bloc
+call unchanged.
 
 ## Tests
 

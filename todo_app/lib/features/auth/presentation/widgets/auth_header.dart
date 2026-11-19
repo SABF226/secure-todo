@@ -1,9 +1,12 @@
 import 'package:material_ui/material_ui.dart';
 
-/// The purple hero shared by the sign-in and sign-up pages.
+/// The header shared by the sign-in and sign-up pages.
 ///
-/// Pure presentation: it takes two strings and draws them. No bloc, no
-/// navigation, nothing to test beyond "it renders".
+/// A light lavender wash rather than a saturated purple block: the brand
+/// stays visible through the badge and the wordmark, without darkening the
+/// top half of the screen.
+///
+/// Pure presentation: two strings in, pixels out. No bloc, no navigation.
 class AuthHeader extends StatelessWidget {
   const AuthHeader({required this.title, required this.subtitle, super.key});
 
@@ -14,18 +17,19 @@ class AuthHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    // Keep the gradient within the primary family so `onPrimary` stays
-    // readable in both brightnesses, instead of introducing a third hue.
-    final end = Color.lerp(scheme.primary, scheme.secondary, 0.65)!;
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(28, 48, 28, 36),
+      padding: const EdgeInsets.fromLTRB(28, 44, 28, 32),
       decoration: BoxDecoration(
+        // Fades into the page background: no hard edge under the header.
         gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [scheme.primary, end],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            scheme.primaryContainer.withValues(alpha: 0.75),
+            scheme.surface,
+          ],
         ),
         borderRadius: const BorderRadius.vertical(bottom: Radius.circular(32)),
       ),
@@ -37,7 +41,7 @@ class AuthHeader extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: scheme.onPrimary.withValues(alpha: 0.16),
+                  color: scheme.primary,
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Icon(
@@ -50,25 +54,25 @@ class AuthHeader extends StatelessWidget {
               Text(
                 'Secure Todo',
                 style: theme.textTheme.labelLarge?.copyWith(
-                  color: scheme.onPrimary.withValues(alpha: 0.85),
+                  color: scheme.primary,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 0.4,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 26),
           Text(
             title,
             style: theme.textTheme.headlineMedium?.copyWith(
-              color: scheme.onPrimary,
+              color: scheme.onSurface,
             ),
           ),
           const SizedBox(height: 6),
           Text(
             subtitle,
             style: theme.textTheme.bodyMedium?.copyWith(
-              color: scheme.onPrimary.withValues(alpha: 0.82),
+              color: scheme.onSurfaceVariant,
             ),
           ),
         ],
