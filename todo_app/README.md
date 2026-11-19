@@ -27,6 +27,16 @@ flutter run -d <ios-simulator> --dart-define=API_BASE_URL=http://localhost:3000/
 flutter run -d <phone> --dart-define=API_BASE_URL=http://192.168.1.20:3000/api/v1
 ```
 
+A **physical Android phone over USB** is simpler with `adb reverse`: the port is tunnelled
+through the cable, so no LAN address and no firewall rule are needed.
+
+```bash
+adb reverse tcp:3000 tcp:3000
+flutter run -d <device-id> --dart-define=API_BASE_URL=http://localhost:3000/api/v1
+```
+
+`adb devices -l` gives the device id. Re-run `adb reverse` after unplugging the phone.
+
 `android/app/src/debug/AndroidManifest.xml` sets `android:usesCleartextTraffic="true"` so the
 debug build can talk plain HTTP to the emulator host. The release manifest is untouched: a
 released app must use HTTPS.
